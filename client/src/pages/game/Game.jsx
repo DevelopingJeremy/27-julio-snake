@@ -37,6 +37,22 @@ const Game = ({ onBack }) => {
     return newFood;
   }, []);
 
+  const handleDirectionChange = (newDir) => {
+    // Prevent 180 degree turns
+    // If we are moving vertically (y!=0) and new dir is vertical (y!=0) but opposite, ignore.
+    if (direction.y !== 0 && newDir.y !== 0 && direction.y !== newDir.y) return;
+    if (direction.x !== 0 && newDir.x !== 0 && direction.x !== newDir.x) return;
+    
+    // Simplification check logic:
+    // If currently moving Y, only allow X changes
+    if (direction.y !== 0 && newDir.x !== 0) setNextDirection(newDir);
+    // If currently moving X, only allow Y changes
+    if (direction.x !== 0 && newDir.y !== 0) setNextDirection(newDir);
+    
+    // Also allow changes if we are stopped (though in this game we are always moving after start)
+    if (direction.x === 0 && direction.y === 0) setNextDirection(newDir);
+  };
+
   // Handle Input
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -44,22 +60,22 @@ const Game = ({ onBack }) => {
         case 'ArrowUp':
         case 'w':
         case 'W':
-          if (direction.y === 0) setNextDirection({ x: 0, y: -1 });
+          handleDirectionChange({ x: 0, y: -1 });
           break;
         case 'ArrowDown':
         case 's':
         case 'S':
-          if (direction.y === 0) setNextDirection({ x: 0, y: 1 });
+          handleDirectionChange({ x: 0, y: 1 });
           break;
         case 'ArrowLeft':
         case 'a':
         case 'A':
-          if (direction.x === 0) setNextDirection({ x: -1, y: 0 });
+          handleDirectionChange({ x: -1, y: 0 });
           break;
         case 'ArrowRight':
         case 'd':
         case 'D':
-          if (direction.x === 0) setNextDirection({ x: 1, y: 0 });
+          handleDirectionChange({ x: 1, y: 0 });
           break;
         default:
           break;
@@ -106,9 +122,8 @@ const Game = ({ onBack }) => {
       if (newHead.x === food.x && newHead.y === food.y) {
         setScore(s => s + 10);
         setFood(generateFood(newSnake));
-        // Don't pop tail (grow)
       } else {
-        newSnake.pop(); // Remove tail
+        newSnake.pop(); 
       }
 
       return newSnake;
@@ -130,6 +145,7 @@ const Game = ({ onBack }) => {
     setGameOver(false);
     setFood(generateFood(INITIAL_SNAKE));
   };
+
 
   return (
     <div className="game-container">
@@ -182,6 +198,14 @@ const Game = ({ onBack }) => {
       {/* Controls Hint */}
       <div className="game-controls-hint">
         Use Arrows or WASD to move
+      </div>
+
+      {/* Mobile Controls */}
+      <div className="mobile-controls">
+         <div className="control-btn control-up" onClick={() => handleDirectionChange({ x: 0, y: -1 })}>↑</div>
+         <div className="control-btn control-left" onClick={() => handleDirectionChange({ x: -1, y: 0 })}>←</div>
+         <div className="control-btn control-down" onClick={() => handleDirectionChange({ x: 0, y: 1 })}>↓</div>
+         <div className="control-btn control-right" onClick={() => handleDirectionChange({ x: 1, y: 0 })}>→</div>
       </div>
     </div>
   );
