@@ -16,6 +16,9 @@
   margin-bottom: 3rem;
   filter: drop-shadow(0 0 30px rgba(34, 197, 94, 0.4));
   animation: float 6s ease-in-out infinite;
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 .menu-logo {
