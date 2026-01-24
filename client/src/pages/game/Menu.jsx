@@ -1,7 +1,7 @@
-
+import '../../game.css';
 import React from 'react';
 
-import logo from '../assets/logo.webp';
+import logo from '../../assets/logo.webp';
 
 const Menu = ({ onStart, onCharacters }) => {
   return (

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import '../game.css';
+import '../../game.css';
 
 const GRID_SIZE = 20;
 const INITIAL_SPEED = 150;

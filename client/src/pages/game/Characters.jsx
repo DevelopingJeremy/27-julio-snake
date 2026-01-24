@@ -1,4 +1,4 @@
-
+import '../../game.css';
 import React, { useState } from 'react';
 
 const INITIAL_CHARACTERS = [
