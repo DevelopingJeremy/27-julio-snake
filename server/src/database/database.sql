@@ -7,14 +7,14 @@ CREATE TABLE IF NOT EXISTS messages_snake (
     type ENUM('text', 'image', 'video', 'audio', 'file') NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS users_snake (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
     color VARCHAR(20) NOT NULL,
     code VARCHAR(20) NULL
-);
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Insert default characters if they don't exist
 INSERT IGNORE INTO users_snake (id, name, color, code) VALUES 
