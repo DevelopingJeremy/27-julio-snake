@@ -86,10 +86,10 @@ io.on("connection", async (socket) => {
                     u.name, u.color,
                     pm.id as reply_id, pm.message as reply_message, pm.type as reply_type, 
                     pu.name as reply_user, pu.color as reply_color
-                FROM messages m 
-                JOIN users u ON m.user_send = u.id 
-                LEFT JOIN messages pm ON m.response_to = pm.id 
-                LEFT JOIN users pu ON pm.user_send = pu.id
+                FROM messages_snake m 
+                JOIN users_snake u ON m.user_send = u.id 
+                LEFT JOIN messages_snake pm ON m.response_to = pm.id 
+                LEFT JOIN users_snake pu ON pm.user_send = pu.id
             `;
             let params = [];
 
@@ -134,7 +134,7 @@ io.on("connection", async (socket) => {
         
         try {
             const [result] = await pool.query(
-                'INSERT INTO messages (user_send, user_receive, message, type, response_to) VALUES (?, ?, ?, ?, ?)',
+                'INSERT INTO messages_snake (user_send, user_receive, message, type, response_to) VALUES (?, ?, ?, ?, ?)',
                 [userId, 0, text, type, responseTo]
             );
             
@@ -148,10 +148,10 @@ io.on("connection", async (socket) => {
                     u.name, u.color,
                     pm.id as reply_id, pm.message as reply_message, pm.type as reply_type, 
                     pu.name as reply_user, pu.color as reply_color
-                FROM messages m 
-                JOIN users u ON m.user_send = u.id 
-                LEFT JOIN messages pm ON m.response_to = pm.id 
-                LEFT JOIN users pu ON pm.user_send = pu.id
+                FROM messages_snake m 
+                JOIN users_snake u ON m.user_send = u.id 
+                LEFT JOIN messages_snake pm ON m.response_to = pm.id 
+                LEFT JOIN users_snake pu ON pm.user_send = pu.id
                 WHERE m.id = ?
             `, [insertId]);
 
@@ -240,12 +240,12 @@ io.on("connection", async (socket) => {
 
         try {
             // Check ownership and valid ID
-            const [rows] = await pool.query('SELECT user_send FROM messages WHERE id = ?', [id]);
+            const [rows] = await pool.query('SELECT user_send FROM messages_snake WHERE id = ?', [id]);
             if (rows.length === 0) return;
             if (rows[0].user_send !== userId) return;
 
             // Update
-            await pool.query('UPDATE messages SET message = ? WHERE id = ?', [text, id]);
+            await pool.query('UPDATE messages_snake SET message = ? WHERE id = ?', [text, id]);
 
             io.emit("messageUpdated", { id, text, isEdited: true });
         } catch (err) {
@@ -259,12 +259,12 @@ io.on("connection", async (socket) => {
 
         try {
              // Check ownership
-            const [rows] = await pool.query('SELECT user_send FROM messages WHERE id = ?', [id]);
+            const [rows] = await pool.query('SELECT user_send FROM messages_snake WHERE id = ?', [id]);
             if (rows.length === 0) return;
             if (rows[0].user_send !== userId) return;
 
             // Hard delete
-            await pool.query('DELETE FROM messages WHERE id = ?', [id]);
+            await pool.query('DELETE FROM messages_snake WHERE id = ?', [id]);
             
             // Also nullify references to this message to avoid broken UI in replies?
             // Actually, if we use foreign keys it might error. If not, it just returns null for join.

@@ -6,7 +6,7 @@ export const login = async (req, res) => {
     const { characterId, code } = req.body;
 
     try {
-        const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [characterId]);
+        const [rows] = await pool.query('SELECT * FROM users_snake WHERE id = ?', [characterId]);
         
         if (rows.length === 0) {
             return res.status(404).json({ message: 'Character not found' });
