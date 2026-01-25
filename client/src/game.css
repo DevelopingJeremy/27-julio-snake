@@ -47,11 +47,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   height: 100%;
   width: 100%;
   padding: 2rem;
+  padding-top: 4rem;
   position: relative;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .characters-title {
@@ -62,6 +65,7 @@
   letter-spacing: 2px;
 }
 
+
 .characters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -69,6 +73,14 @@
   width: 100%;
   max-width: 1000px;
   margin-bottom: 3rem;
+  flex-shrink: 0; 
+}
+
+.characters-container .btn {
+    margin-bottom: 2rem;
+    flex-shrink: 0;
+    width: auto;
+    padding: 0.8rem 2rem;
 }
 
 .character-card {
@@ -152,6 +164,24 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  position: relative;
+  z-index: 101;
+  margin: auto; /* Ensure it floats in center */
+}
+
+.unlock-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex !important;
+  align-items: center !important; /* Vertical Center */
+  justify-content: center !important; /* Horizontal Center */
+  z-index: 9999 !important;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .unlock-title {

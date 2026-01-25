@@ -3,7 +3,7 @@ import '../../game.css';
 import React from 'react';
 import logo from '../../assets/logo.webp';
 
-const Menu = ({ onStart, onCharacters }) => {
+const Menu = ({ onStart, onCharacters, onChat }) => {
   return (
     <div className="full-screen-center glass-panel">
       <div className="menu-logo-container">
