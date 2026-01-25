@@ -19,7 +19,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(requestIp.mw()); 
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: ['http://localhost:5173', 'https://27-julio-snake-rbw7.vercel.app'],
     credentials: true
 }));
 
@@ -39,7 +39,7 @@ app.use('/api', uploadRoutes);
 const server = createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:5173",
+        origin: ["http://localhost:5173", "https://27-julio-snake-rbw7.vercel.app"],
         credentials: true
     },
 });
