@@ -29,6 +29,7 @@ const Chat = ({ onBack }) => {
     const [editingMessage, setEditingMessage] = useState(null);
     const [activeMessageOptions, setActiveMessageOptions] = useState(null); // ID of message with open options
     const [isViewingHistoryMode, setIsViewingHistoryMode] = useState(false);
+    const [isSending, setIsSending] = useState(false);
 
     useEffect(() => {
         // Initialize socket
@@ -230,6 +231,7 @@ const Chat = ({ onBack }) => {
     const handleFileSelect = async (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+            setIsSending(true); // Start sending indicator
             const result = await uploadFile(file);
             if (result) {
                 const messageData = {
@@ -240,6 +242,7 @@ const Chat = ({ onBack }) => {
                 socketRef.current?.emit('sendMessage', messageData);
                 setReplyingTo(null);
             }
+            setIsSending(false); // End sending indicator
         }
         e.target.value = '';
     };
@@ -262,6 +265,7 @@ const Chat = ({ onBack }) => {
             setInput('');
             if (inputRef.current) {
                 inputRef.current.style.height = 'auto';
+                inputRef.current.focus(); // Keep focus
             }
         }
     };
@@ -408,6 +412,12 @@ const Chat = ({ onBack }) => {
                 {isLoadingMore && messages.length > 0 && (
                     <div className="chat-loading-message">
                         Cargando historial...
+                    </div>
+                )}
+
+                {isSending && (
+                     <div className="chat-loading-message" style={{ position: 'sticky', bottom: '10px', zIndex: 10 }}>
+                        Enviando archivo...
                     </div>
                 )}
 

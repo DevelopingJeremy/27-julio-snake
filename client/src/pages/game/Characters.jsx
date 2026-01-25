@@ -35,6 +35,7 @@ const Characters = ({ onBack, onChat }) => {
   const [selectedChar, setSelectedChar] = useState(null); 
   const [unlockCode, setUnlockCode] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleCharacterClick = (char) => {
     // If locked, open modal to login
@@ -43,15 +44,12 @@ const Characters = ({ onBack, onChat }) => {
       setUnlockCode('');
       setError('');
     } else {
-       // If not locked (like the Green one), we might want to auto-login as guest or just let them use it?
-       // For now, let's assume the user wants the secure flow for locked ones mainly.
-       // But consistency implies we should probably login for any selection if we want chat identity.
-       // Let's stick to the request: "digitar el codigo entramos" -> implies locked ones.
-       // We can add a "Select" button for open ones later if needed.
+       // ...
     }
   };
 
   const handleUnlock = async () => {
+    setIsLoading(true);
     try {
         const response = await fetch(`${BACKEND_URL}/api/login`, {
             method: 'POST',
@@ -77,9 +75,11 @@ const Characters = ({ onBack, onChat }) => {
             if (onChat) onChat();
         } else {
             setError(data.message || 'Error de autenticación');
+            setIsLoading(false);
         }
     } catch (err) {
         setError('Error de conexión');
+        setIsLoading(false);
     }
   };
 
@@ -150,8 +150,10 @@ const Characters = ({ onBack, onChat }) => {
                     {error && <p className="unlock-error">{error}</p>}
 
                     <div className="unlock-buttons">
-                        <button className="btn" style={{ padding: '8px 12px', fontSize: '0.9rem', width: 'auto' }} onClick={() => setSelectedChar(null)}>Cancelar</button>
-                        <button className="btn btn-primary" style={{ padding: '8px 12px', fontSize: '0.9rem', width: 'auto' }} onClick={handleUnlock}>Confirmar</button>
+                        <button className="btn" style={{ padding: '8px 12px', fontSize: '0.9rem', width: 'auto' }} onClick={() => !isLoading && setSelectedChar(null)} disabled={isLoading}>Cancelar</button>
+                        <button className="btn btn-primary" style={{ padding: '8px 12px', fontSize: '0.9rem', width: 'auto' }} onClick={handleUnlock} disabled={isLoading}>
+                            {isLoading ? 'Cargando...' : 'Confirmar'}
+                        </button>
                     </div>
                 </div>
             </div>
