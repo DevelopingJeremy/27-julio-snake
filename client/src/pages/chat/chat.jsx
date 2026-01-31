@@ -349,6 +349,11 @@ const Chat = ({ onBack }) => {
         return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
+    const formatTime = (dateString) => {
+        if (!dateString) return '';
+        return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
     const scrollToMessage = (id) => {
         const element = document.getElementById(`msg-${id}`);
         if (element) {
@@ -542,7 +547,7 @@ const Chat = ({ onBack }) => {
                                     
                                     <div className="chat-message-footer">
                                         <span className="chat-timestamp">
-                                            {msg.timestamp}
+                                            {formatTime(msg.createdAt)}
                                         </span>
                                         <span
                                             className="chat-options-trigger"
