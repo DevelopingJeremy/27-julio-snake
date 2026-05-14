@@ -39,7 +39,11 @@ router.post('/upload', upload.single('file'), (req, res) => {
         return res.status(400).send('No file uploaded.');
     }
 
-    const requestedType = typeof req.body.type === 'string' ? req.body.type.trim().toLowerCase() : '';
+    const requestedType = typeof req.body.category === 'string'
+        ? req.body.category.trim().toLowerCase()
+        : typeof req.body.type === 'string'
+            ? req.body.type.trim().toLowerCase()
+            : '';
     if (!ALLOWED_UPLOAD_TYPES.has(requestedType)) {
         return res.status(400).json({ message: 'Invalid file type category.' });
     }
@@ -56,7 +60,8 @@ router.post('/upload', upload.single('file'), (req, res) => {
 
     res.json({ 
         filename: req.file.filename,
-        type: requestedType
+        type: requestedType,
+        category: requestedType
     });
 });
 

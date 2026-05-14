@@ -358,9 +358,11 @@ const Chat = ({ onBack }) => {
     };
 
     const uploadFile = async (file, explicitType = null) => {
+        const category = explicitType || getUploadCategory(file);
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('type', explicitType || getUploadCategory(file));
+        formData.append('type', category);
+        formData.append('category', category);
         try {
             const response = await fetch(`${BACKEND_URL}/api/upload`, {
                 method: 'POST',
@@ -370,7 +372,8 @@ const Chat = ({ onBack }) => {
                 const errorText = await response.text();
                 throw new Error(errorText || 'Upload failed');
             }
-            return await response.json();
+            const payload = await response.json();
+            return { ...payload, category };
         } catch (err) {
             console.error(err);
             alert('Error al subir archivo');
@@ -400,7 +403,7 @@ const Chat = ({ onBack }) => {
             if (result) {
                 const messageData = {
                     text: result.filename,
-                    type: result.type,
+                    type: result.category,
                     responseTo: replyingTo ? replyingTo.id : null
                 };
                 socketRef.current?.emit('sendMessage', messageData);
@@ -452,7 +455,7 @@ const Chat = ({ onBack }) => {
                 if (result) {
                     socketRef.current?.emit('sendMessage', {
                         text: result.filename,
-                        type: result.type,
+                        type: result.category,
                         responseTo: replyingTo ? replyingTo.id : null
                     });
                     setReplyingTo(null);
