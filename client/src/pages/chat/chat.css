@@ -378,6 +378,13 @@
     transform: scale(0.95);
 }
 
+.chat-audio-play-btn:disabled {
+    cursor: wait;
+    opacity: 0.75;
+    transform: none;
+    filter: saturate(0.8);
+}
+
 .chat-audio-track {
     flex: 1;
     min-width: 0;
@@ -397,6 +404,11 @@
     outline: none;
     cursor: pointer;
     accent-color: var(--accent-primary);
+}
+
+.chat-audio-progress:disabled {
+    cursor: default;
+    opacity: 0.6;
 }
 
 .chat-audio-progress::-webkit-slider-thumb {

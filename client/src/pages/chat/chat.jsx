@@ -39,12 +39,40 @@ const ChatAudioPlayer = ({ src }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    const [isReady, setIsReady] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
 
-        const handleLoadedMetadata = () => setDuration(audio.duration || 0);
+        setIsReady(false);
+        setIsLoading(true);
+        audio.load();
+
+        const updateDuration = () => {
+            const nextDuration = audio.duration || 0;
+            if (nextDuration > 0) {
+                setDuration(nextDuration);
+            }
+        };
+        const markReady = () => {
+            updateDuration();
+            if ((audio.duration || 0) > 0) {
+                setIsReady(true);
+                setIsLoading(false);
+            }
+        };
+
+        const handleLoadedMetadata = () => {
+            updateDuration();
+            if ((audio.duration || 0) > 0) {
+                setIsLoading(false);
+            }
+        };
+        const handleLoadedData = markReady;
+        const handleCanPlay = markReady;
+        const handleCanPlayThrough = markReady;
         const handleTimeUpdate = () => setCurrentTime(audio.currentTime || 0);
         const handleEnded = () => {
             setIsPlaying(false);
@@ -52,21 +80,43 @@ const ChatAudioPlayer = ({ src }) => {
         };
         const handlePause = () => setIsPlaying(false);
         const handlePlay = () => setIsPlaying(true);
+        const handleWaiting = () => setIsLoading(true);
+        const handlePlaying = () => {
+            setIsPlaying(true);
+            setIsLoading(false);
+            setIsReady(true);
+        };
+        const handleError = () => {
+            setIsPlaying(false);
+            setIsLoading(false);
+        };
 
         audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.addEventListener('loadeddata', handleLoadedData);
+        audio.addEventListener('canplay', handleCanPlay);
+        audio.addEventListener('canplaythrough', handleCanPlayThrough);
         audio.addEventListener('timeupdate', handleTimeUpdate);
         audio.addEventListener('ended', handleEnded);
         audio.addEventListener('pause', handlePause);
         audio.addEventListener('play', handlePlay);
+        audio.addEventListener('waiting', handleWaiting);
+        audio.addEventListener('playing', handlePlaying);
+        audio.addEventListener('error', handleError);
 
         return () => {
             audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            audio.removeEventListener('loadeddata', handleLoadedData);
+            audio.removeEventListener('canplay', handleCanPlay);
+            audio.removeEventListener('canplaythrough', handleCanPlayThrough);
             audio.removeEventListener('timeupdate', handleTimeUpdate);
             audio.removeEventListener('ended', handleEnded);
             audio.removeEventListener('pause', handlePause);
             audio.removeEventListener('play', handlePlay);
+            audio.removeEventListener('waiting', handleWaiting);
+            audio.removeEventListener('playing', handlePlaying);
+            audio.removeEventListener('error', handleError);
         };
-    }, []);
+    }, [src]);
 
     const togglePlayback = async (e) => {
         e.stopPropagation();
@@ -79,9 +129,33 @@ const ChatAudioPlayer = ({ src }) => {
         }
 
         try {
+            setIsLoading(true);
+            if (!isReady) {
+                audio.load();
+                await new Promise((resolve, reject) => {
+                    const onReady = () => {
+                        cleanup();
+                        resolve();
+                    };
+                    const onError = () => {
+                        cleanup();
+                        reject(new Error('Audio failed to load'));
+                    };
+                    const cleanup = () => {
+                        audio.removeEventListener('canplaythrough', onReady);
+                        audio.removeEventListener('canplay', onReady);
+                        audio.removeEventListener('error', onError);
+                    };
+
+                    audio.addEventListener('canplaythrough', onReady, { once: true });
+                    audio.addEventListener('canplay', onReady, { once: true });
+                    audio.addEventListener('error', onError, { once: true });
+                });
+            }
             await audio.play();
         } catch (error) {
             console.error(error);
+            setIsLoading(false);
         }
     };
 
@@ -97,9 +171,9 @@ const ChatAudioPlayer = ({ src }) => {
 
     return (
         <div className="chat-audio-player-shell" onClick={(e) => e.stopPropagation()}>
-            <audio ref={audioRef} preload="metadata" src={src} />
-            <button type="button" className="chat-audio-play-btn" onClick={togglePlayback}>
-                {isPlaying ? '❚❚' : '▶'}
+            <audio ref={audioRef} preload="auto" src={src} />
+            <button type="button" className="chat-audio-play-btn" onClick={togglePlayback} disabled={isLoading && !isPlaying}>
+                {isLoading && !isPlaying ? '…' : isPlaying ? '❚❚' : '▶'}
             </button>
             <div className="chat-audio-track">
                 <input
@@ -110,10 +184,11 @@ const ChatAudioPlayer = ({ src }) => {
                     value={Math.min(currentTime, duration || 0)}
                     onChange={handleSeek}
                     className="chat-audio-progress"
+                    disabled={!duration}
                 />
                 <div className="chat-audio-times">
-                    <span>{formatAudioTime(currentTime)}</span>
-                    <span>{formatAudioTime(duration)}</span>
+                    <span>{isLoading && !duration ? 'Cargando...' : formatAudioTime(currentTime)}</span>
+                    <span>{duration ? formatAudioTime(duration) : '--:--'}</span>
                 </div>
             </div>
         </div>
