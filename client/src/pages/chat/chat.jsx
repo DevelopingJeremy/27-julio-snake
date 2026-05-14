@@ -722,7 +722,7 @@ const Chat = ({ onBack }) => {
                                         )}
                                     </div>
                                 )}
-
+{/* Hola intento de cambio */}
                                 {msg.reply && (
                                     <div
                                         className="chat-reply-bubble"
