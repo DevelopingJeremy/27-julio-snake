@@ -11,6 +11,7 @@ console.log("En routes");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadDir = path.resolve(__dirname, '../../uploads');
+const ALLOWED_UPLOAD_TYPES = new Set(['image', 'video', 'audio', 'file']);
 
 const ensureUploadDir = () => {
     if (!fs.existsSync(uploadDir)) {
@@ -38,30 +39,24 @@ router.post('/upload', upload.single('file'), (req, res) => {
         return res.status(400).send('No file uploaded.');
     }
 
+    const requestedType = typeof req.body.type === 'string' ? req.body.type.trim().toLowerCase() : '';
+    if (!ALLOWED_UPLOAD_TYPES.has(requestedType)) {
+        return res.status(400).json({ message: 'Invalid file type category.' });
+    }
+
     console.log('[upload] file saved', {
         originalname: req.file.originalname,
         filename: req.file.filename,
         mimetype: req.file.mimetype,
         destination: req.file.destination,
         path: req.file.path,
-        existsAfterSave: fs.existsSync(req.file.path)
+        existsAfterSave: fs.existsSync(req.file.path),
+        requestedType
     });
-    
-    // Determine type based on mimetype or extension
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    let type = 'file';
-    
-    if (req.file.mimetype.startsWith('image/') || ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(ext)) {
-        type = 'image';
-    } else if (req.file.mimetype.startsWith('video/') || ['.mp4', '.webm', '.ogg', '.mov', '.avi'].includes(ext)) {
-        type = 'video';
-    } else if (req.file.mimetype.startsWith('audio/') || ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.webm'].includes(ext)) {
-        type = 'audio';
-    }
 
     res.json({ 
         filename: req.file.filename,
-        type: type
+        type: requestedType
     });
 });
 

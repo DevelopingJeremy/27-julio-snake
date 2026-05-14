@@ -350,9 +350,17 @@ const Chat = ({ onBack }) => {
         }
     };
 
-    const uploadFile = async (file) => {
+    const getUploadCategory = (file) => {
+        if (file.type.startsWith('image/')) return 'image';
+        if (file.type.startsWith('video/')) return 'video';
+        if (file.type.startsWith('audio/')) return 'audio';
+        return 'file';
+    };
+
+    const uploadFile = async (file, explicitType = null) => {
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('type', explicitType || getUploadCategory(file));
         try {
             const response = await fetch(`${BACKEND_URL}/api/upload`, {
                 method: 'POST',
@@ -375,7 +383,7 @@ const Chat = ({ onBack }) => {
         const audioFile = new File([audioBlob], `audio-${Date.now()}.${extension}`, {
             type: audioBlob.type || `audio/${extension}`
         });
-        return uploadFile(audioFile);
+        return uploadFile(audioFile, 'audio');
     };
 
     const formatRecordingTime = (seconds) => {
@@ -722,7 +730,7 @@ const Chat = ({ onBack }) => {
                                         )}
                                     </div>
                                 )}
-{/* Hola intento de cambio */}
+
                                 {msg.reply && (
                                     <div
                                         className="chat-reply-bubble"
