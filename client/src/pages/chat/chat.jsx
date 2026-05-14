@@ -6,8 +6,124 @@ import './chat.css';
 
 import { BACKEND_URL } from '../../includes/constantes.js';
 
+const formatAudioTime = (seconds) => {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+        return '00:00';
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
+const isAudioFile = (filename) => {
+    if (!filename) return false;
+    const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.webm'];
+    return audioExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+};
+
+const isImageFile = (filename) => {
+    if (!filename) return false;
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+    return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+};
+
+const isVideoFile = (filename) => {
+    if (!filename) return false;
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi'];
+    return videoExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+};
+
+const ChatAudioPlayer = ({ src }) => {
+    const audioRef = useRef(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [duration, setDuration] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const handleLoadedMetadata = () => setDuration(audio.duration || 0);
+        const handleTimeUpdate = () => setCurrentTime(audio.currentTime || 0);
+        const handleEnded = () => {
+            setIsPlaying(false);
+            setCurrentTime(0);
+        };
+        const handlePause = () => setIsPlaying(false);
+        const handlePlay = () => setIsPlaying(true);
+
+        audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.addEventListener('timeupdate', handleTimeUpdate);
+        audio.addEventListener('ended', handleEnded);
+        audio.addEventListener('pause', handlePause);
+        audio.addEventListener('play', handlePlay);
+
+        return () => {
+            audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            audio.removeEventListener('timeupdate', handleTimeUpdate);
+            audio.removeEventListener('ended', handleEnded);
+            audio.removeEventListener('pause', handlePause);
+            audio.removeEventListener('play', handlePlay);
+        };
+    }, []);
+
+    const togglePlayback = async (e) => {
+        e.stopPropagation();
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        if (isPlaying) {
+            audio.pause();
+            return;
+        }
+
+        try {
+            await audio.play();
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const handleSeek = (e) => {
+        e.stopPropagation();
+        const audio = audioRef.current;
+        if (!audio || !duration) return;
+
+        const nextTime = Number(e.target.value);
+        audio.currentTime = nextTime;
+        setCurrentTime(nextTime);
+    };
+
+    return (
+        <div className="chat-audio-player-shell" onClick={(e) => e.stopPropagation()}>
+            <audio ref={audioRef} preload="metadata" src={src} />
+            <button type="button" className="chat-audio-play-btn" onClick={togglePlayback}>
+                {isPlaying ? '❚❚' : '▶'}
+            </button>
+            <div className="chat-audio-track">
+                <input
+                    type="range"
+                    min="0"
+                    max={duration || 0}
+                    step="0.1"
+                    value={Math.min(currentTime, duration || 0)}
+                    onChange={handleSeek}
+                    className="chat-audio-progress"
+                />
+                <div className="chat-audio-times">
+                    <span>{formatAudioTime(currentTime)}</span>
+                    <span>{formatAudioTime(duration)}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const Chat = ({ onBack }) => {
     const socketRef = useRef(null); // Use ref to keep socket instance
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
     /* State */
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -17,7 +133,6 @@ const Chat = ({ onBack }) => {
     const inputRef = useRef(null);
     const fileInputRef = useRef(null);
     const cameraInputRef = useRef(null);
-    const docInputRef = useRef(null);
     const [isConnected, setIsConnected] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -30,6 +145,9 @@ const Chat = ({ onBack }) => {
     const [activeMessageOptions, setActiveMessageOptions] = useState(null); // ID of message with open options
     const [isViewingHistoryMode, setIsViewingHistoryMode] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+    const [recordingError, setRecordingError] = useState('');
+    const [recordingSeconds, setRecordingSeconds] = useState(0);
 
     useEffect(() => {
         // Initialize socket
@@ -135,6 +253,19 @@ const Chat = ({ onBack }) => {
         };
     }, [isViewingHistoryMode]); // Re-bind listener to capture state? No, avoid stale closures with refs if needed, or simple updates.
 
+    useEffect(() => {
+        if (!isRecordingAudio) {
+            setRecordingSeconds(0);
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            setRecordingSeconds((prev) => prev + 1);
+        }, 1000);
+
+        return () => window.clearInterval(intervalId);
+    }, [isRecordingAudio]);
+
     // ... (Scroll logic stays same)
     const prevScrollHeightRef = useRef(0);
     const jumpTargetIdRef = useRef(null);
@@ -184,6 +315,14 @@ const Chat = ({ onBack }) => {
     }, [activeMessageOptions]);
 
     const [showScrollDown, setShowScrollDown] = useState(false);
+    const chatToken = sessionStorage.getItem('chat_token');
+    const buildUploadUrl = (filename) => {
+        const url = new URL(`${BACKEND_URL}/uploads/${filename}`);
+        if (chatToken) {
+            url.searchParams.set('token', chatToken);
+        }
+        return url.toString();
+    };
 
     const handleScroll = () => {
         const container = messagesContainerRef.current;
@@ -219,13 +358,30 @@ const Chat = ({ onBack }) => {
                 method: 'POST',
                 body: formData
             });
-            if (!response.ok) throw new Error('Upload failed');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Upload failed');
+            }
             return await response.json();
         } catch (err) {
             console.error(err);
             alert('Error al subir archivo');
             return null;
         }
+    };
+
+    const uploadRecordedAudio = async (audioBlob) => {
+        const extension = audioBlob.type.includes('webm') ? 'webm' : 'wav';
+        const audioFile = new File([audioBlob], `audio-${Date.now()}.${extension}`, {
+            type: audioBlob.type || `audio/${extension}`
+        });
+        return uploadFile(audioFile);
+    };
+
+    const formatRecordingTime = (seconds) => {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
     };
 
     const handleFileSelect = async (e) => {
@@ -245,6 +401,74 @@ const Chat = ({ onBack }) => {
             setIsSending(false); // End sending indicator
         }
         e.target.value = '';
+    };
+
+    const stopAudioRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        }
+    };
+
+    const startAudioRecording = async () => {
+        setRecordingError('');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : 'audio/webm';
+
+            audioChunksRef.current = [];
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const recordedBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
+                stream.getTracks().forEach((track) => track.stop());
+                mediaRecorderRef.current = null;
+                audioChunksRef.current = [];
+                setIsRecordingAudio(false);
+
+                if (recordedBlob.size === 0) {
+                    setRecordingError('No se pudo grabar el audio.');
+                    return;
+                }
+
+                setIsSending(true);
+                const result = await uploadRecordedAudio(recordedBlob);
+                if (result) {
+                    socketRef.current?.emit('sendMessage', {
+                        text: result.filename,
+                        type: result.type,
+                        responseTo: replyingTo ? replyingTo.id : null
+                    });
+                    setReplyingTo(null);
+                }
+                setIsSending(false);
+            };
+
+            mediaRecorder.onerror = () => {
+                setRecordingError('Ocurrió un error al grabar audio.');
+                stream.getTracks().forEach((track) => track.stop());
+                mediaRecorderRef.current = null;
+                audioChunksRef.current = [];
+                setIsRecordingAudio(false);
+            };
+
+            mediaRecorder.start();
+            setShowAttachMenu(false);
+            setIsRecordingAudio(true);
+            setRecordingSeconds(0);
+        } catch (error) {
+            console.error(error);
+            setRecordingError('No se pudo acceder al micrófono.');
+            setIsRecordingAudio(false);
+        }
     };
 
     const sendMessage = (e) => {
@@ -397,6 +621,7 @@ const Chat = ({ onBack }) => {
                         Chat
                     </span>
                     {error && <span className="chat-status-error">{error}</span>}
+                    {recordingError && <span className="chat-status-error">{recordingError}</span>}
                     {isConnected && <span className="chat-status-connected">Conectado como {currentUser?.name}</span>}
                 </div>
                 <div className="chat-placeholder"></div>
@@ -423,6 +648,14 @@ const Chat = ({ onBack }) => {
                 {isSending && (
                      <div className="chat-loading-message" style={{ position: 'sticky', bottom: '10px', zIndex: 10 }}>
                         Enviando archivo...
+                    </div>
+                )}
+
+                {isRecordingAudio && (
+                    <div className="chat-recording-banner">
+                        <span className="chat-recording-dot"></span>
+                        <span>Grabando</span>
+                        <span className="chat-recording-time">{formatRecordingTime(recordingSeconds)}</span>
                     </div>
                 )}
 
@@ -462,7 +695,7 @@ const Chat = ({ onBack }) => {
                                 </div>
                             )}
 
-                            <div id={`msg-${msg.id}`} className={`chat-message-row ${isMe ? 'mod-me' : 'mod-other'} ${isGrouped ? 'grouped' : ''}`} style={{ marginTop: isGrouped ? '-4px' : '10px' }}>
+                            <div id={`msg-${msg.id}`} className={`chat-message-row ${isMe ? 'mod-me' : 'mod-other'} ${isGrouped ? 'grouped' : ''}`} style={{ marginTop: isGrouped ? '-2px' : '4px' }}>
                                 
                                 {!isGrouped && (
                                     <span className="chat-message-sender-name">
@@ -477,9 +710,11 @@ const Chat = ({ onBack }) => {
                                         </button>
                                         {isMe && (
                                             <>
-                                                <button className="chat-option-btn" onClick={() => startEdit(msg)}>
-                                                    <i className="fas fa-pen"></i> Editar
-                                                </button>
+                                                {(!msg.type || msg.type === 'text') && (
+                                                    <button className="chat-option-btn" onClick={() => startEdit(msg)}>
+                                                        <i className="fas fa-pen"></i> Editar
+                                                    </button>
+                                                )}
                                                 <button className="chat-option-btn delete" onClick={() => handleDelete(msg.id)}>
                                                     <i className="fas fa-trash"></i> Eliminar
                                                 </button>
@@ -499,6 +734,7 @@ const Chat = ({ onBack }) => {
                                             {msg.reply.type !== 'text' ? (
                                                 msg.reply.type === 'image' ? '📷 Foto' :
                                                     msg.reply.type === 'video' ? '🎥 Video' :
+                                                        msg.reply.type === 'audio' ? 'Audio' :
                                                         '📄 Archivo'
                                             ) : msg.reply.text}
                                         </div>
@@ -513,26 +749,34 @@ const Chat = ({ onBack }) => {
                                         marginTop: '0'
                                     }}
                                     onClick={() => {
-                                        if (msg.type === 'image' || msg.type === 'video') {
-                                            setViewingMedia(msg);
+                                        if (msg.type === 'image' || msg.type === 'video' || (msg.type === 'file' && (isImageFile(msg.text) || isVideoFile(msg.text)))) {
+                                            setViewingMedia({
+                                                ...msg,
+                                                type: msg.type === 'file' ? (isImageFile(msg.text) ? 'image' : 'video') : msg.type
+                                            });
                                         }
                                     }}
                                 >
-                                    {msg.type === 'image' && (
+                                    {(msg.type === 'image' || (msg.type === 'file' && isImageFile(msg.text))) && (
                                         <div className="chat-media-indicator">
                                             <span>📷</span>
                                             <span style={{ textDecoration: 'underline' }}>Foto</span>
                                         </div>
                                     )}
-                                    {msg.type === 'video' && (
+                                    {(msg.type === 'video') && (
                                         <div className="chat-media-indicator">
                                             <span>🎥</span>
                                             <span style={{ textDecoration: 'underline' }}>Video</span>
                                         </div>
                                     )}
-                                    {msg.type === 'file' && (
+                                    {(msg.type === 'audio' || (msg.type === 'file' && isAudioFile(msg.text))) && (
+                                        <div className="chat-audio-message">
+                                            <ChatAudioPlayer src={buildUploadUrl(msg.text)} />
+                                        </div>
+                                    )}
+                                    {msg.type === 'file' && !isAudioFile(msg.text) && !isImageFile(msg.text) && !isVideoFile(msg.text) && (
                                         <a
-                                            href={`${BACKEND_URL}/uploads/${msg.text}`}
+                                            href={buildUploadUrl(msg.text)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="chat-file-link"
@@ -616,9 +860,10 @@ const Chat = ({ onBack }) => {
                         {replyingTo && (
                             <span className="chat-action-replying">
                                 Respondiendo a <strong style={{ color: replyingTo.color }}>{replyingTo.user}</strong>: {
-                                    replyingTo.type === 'image' ? '[Foto]' :
-                                        replyingTo.type === 'video' ? '[Video]' :
-                                            replyingTo.type === 'file' ? '[Archivo]' :
+                                    replyingTo.type === 'image' ? '📷 Foto' :
+                                        replyingTo.type === 'video' ? '🎥 Video' :
+                                            replyingTo.type === 'audio' ? 'Audio' :
+                                            replyingTo.type === 'file' ? '📄 Archivo' :
                                                 replyingTo.text
                                 }
                             </span>
@@ -645,7 +890,7 @@ const Chat = ({ onBack }) => {
                     ref={fileInputRef}
                     onChange={handleFileSelect}
                     style={{ display: 'none' }}
-                    accept="image/*,video/*"
+                    accept="image/*,video/*,audio/*"
                 />
                 <input
                     type="file"
@@ -654,13 +899,6 @@ const Chat = ({ onBack }) => {
                     style={{ display: 'none' }}
                     accept="image/*,video/*"
                     capture="environment"
-                />
-                <input
-                    type="file"
-                    ref={docInputRef}
-                    onChange={handleFileSelect}
-                    style={{ display: 'none' }}
-                // Accept all files
                 />
 
                 {/* Attach Menu */}
@@ -688,7 +926,7 @@ const Chat = ({ onBack }) => {
                                 setShowAttachMenu(false);
                             }}
                         >
-                            <span style={{ fontSize: '1.2rem' }}>🖼️</span> Galería
+                            <span style={{ fontSize: '1.2rem' }}>📷</span> Multimedia
                         </button>
                         <button
                             type="button"
@@ -700,17 +938,6 @@ const Chat = ({ onBack }) => {
                             }}
                         >
                             <span style={{ fontSize: '1.2rem' }}>📷</span> Cámara
-                        </button>
-                        <button
-                            type="button"
-                            className="btn"
-                            style={{ display: 'none', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', textAlign: 'left' }}
-                            onClick={() => {
-                                docInputRef.current?.click();
-                                setShowAttachMenu(false);
-                            }}
-                        >
-                            <span style={{ fontSize: '1.2rem' }}>📄</span> Documento
                         </button>
                     </div>
                 )}
@@ -726,22 +953,50 @@ const Chat = ({ onBack }) => {
                     +
                 </button>
 
-                <textarea
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => {
-                        setInput(e.target.value);
-                        handleInputResize(e);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    placeholder={isConnected ? "Escribe un mensaje..." : "Bloqueado"}
-                    disabled={!isConnected}
-                    className="chat-input-field"
-                    rows={1}
-                />
-                <button type="submit" className="btn btn-primary chat-send-btn" disabled={!isConnected || !input.trim()}>
-                    ➤
-                </button>
+                {isRecordingAudio ? (
+                    <div className="chat-recording-composer" role="status" aria-live="polite">
+                        <div className="chat-recording-composer-main">
+                            <span className="chat-recording-dot"></span>
+                            <span className="chat-recording-label">Grabando audio</span>
+                        </div>
+                        <span className="chat-recording-composer-time">{formatRecordingTime(recordingSeconds)}</span>
+                    </div>
+                ) : (
+                    <textarea
+                        ref={inputRef}
+                        value={input}
+                        onChange={(e) => {
+                            setInput(e.target.value);
+                            handleInputResize(e);
+                        }}
+                        onKeyDown={handleKeyDown}
+                        placeholder={isConnected ? "Escribe un mensaje..." : "Bloqueado"}
+                        disabled={!isConnected}
+                        className="chat-input-field"
+                        rows={1}
+                    />
+                )}
+                {input.trim() ? (
+                    <button type="submit" className="btn btn-primary chat-send-btn" disabled={!isConnected || !input.trim() || isRecordingAudio}>
+                        ➤
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        className={`btn chat-send-btn ${isRecordingAudio ? 'chat-recording-stop-btn' : 'btn-primary'}`}
+                        disabled={!isConnected || isSending}
+                        onClick={() => {
+                            if (isRecordingAudio) {
+                                stopAudioRecording();
+                            } else {
+                                startAudioRecording();
+                            }
+                        }}
+                        title={isRecordingAudio ? 'Detener grabación' : 'Grabar audio'}
+                    >
+                        {isRecordingAudio ? '■' : '🎤'}
+                    </button>
+                )}
             </form>
 
             {/* Media Viewer Modal */}
@@ -757,7 +1012,7 @@ const Chat = ({ onBack }) => {
                     <div className="chat-media-container">
                         {viewingMedia.type === 'image' && (
                             <img
-                                src={`${BACKEND_URL}/uploads/${viewingMedia.text}`}
+                                src={buildUploadUrl(viewingMedia.text)}
                                 alt="Shared content"
                                 className="chat-media-element"
                                 style={{ objectFit: 'contain', boxShadow: `0 0 20px ${viewingMedia.color}` }}
@@ -765,7 +1020,7 @@ const Chat = ({ onBack }) => {
                         )}
                         {viewingMedia.type === 'video' && (
                             <video
-                                src={`${BACKEND_URL}/uploads/${viewingMedia.text}`}
+                                src={buildUploadUrl(viewingMedia.text)}
                                 controls
                                 autoPlay
                                 className="chat-media-element"
